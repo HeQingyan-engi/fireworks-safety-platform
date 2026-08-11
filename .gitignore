@@ -46,3 +46,9 @@ server/prisma/*.db-journal
 server/uploads/*
 !server/uploads/.gitkeep
 server/.env
+
+# Private notes (personal coaching / strategy files)
+docs/iot-learning-path.md
+docs/boss-resume.md
+docs/resume.md
+docs/resume-content.md

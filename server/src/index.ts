@@ -3,6 +3,8 @@ import app from './app.js'
 import { config } from './config/index.js'
 import { initSocket } from './services/socketManager.js'
 import { initMQTT } from './services/mqtt/broker.js'
+import { startModbusSimulator } from './services/modbus/simulator.js'
+import { startModbusBridge } from './services/modbus/bridge.js'
 import { initScheduler } from './services/scheduler.js'
 import { seedDefaultRules } from './services/rules/engine.js'
 import logger from './utils/logger.js'
@@ -28,6 +30,16 @@ async function bootstrap() {
 
   // 5. Connect to MQTT broker (fails gracefully if unavailable)
   await initMQTT()
+
+  // 5b. [Dev] Start Modbus TCP simulator + bridge (模拟工业传感器)
+  if (config.nodeEnv === 'development') {
+    startModbusSimulator(5020)
+    // 延迟 1 秒等模拟器就绪后启动桥接
+    setTimeout(() => {
+      startModbusBridge('127.0.0.1', 5020, 1, 'CQ001', 'MODBUS-TH-001', 5000)
+    }, 1000)
+    logger.info('✅ Modbus simulator + bridge started (dev mode)')
+  }
 
   // 6. Start scheduled tasks (periodic checks, escalations, cleanup)
   initScheduler()

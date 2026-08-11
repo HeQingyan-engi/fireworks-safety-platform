@@ -18,7 +18,7 @@
  *   地址 10 → 采样间隔 (秒)  可写，默认 30
  */
 
-import Modbus from 'modbus-serial'
+import { ServerTCP } from 'modbus-serial'
 import logger from '../../utils/logger.js'
 
 // 模拟的传感器数据（会随时间微微波动，模拟真实读数）
@@ -30,7 +30,7 @@ const sensorState = {
   sampleInterval: 30,   // 秒
 }
 
-let server: Modbus.ModbusTCPServer | null = null
+let server: ServerTCP | null = null
 let waveTimer: ReturnType<typeof setInterval> | null = null
 
 /**
@@ -56,7 +56,7 @@ export function startModbusSimulator(port: number = 5020): void {
       }
     },
     // 写 Holding Register（功能码 06）—— 允许修改采样间隔
-    setHoldingRegister: (addr: number, value: number) => {
+    setRegister: (addr: number, value: number) => {
       if (addr === 10) {
         sensorState.sampleInterval = value
         logger.info(`[Modbus Simulator] Sample interval set to ${value}s`)
@@ -64,17 +64,22 @@ export function startModbusSimulator(port: number = 5020): void {
     },
   }
 
-  const modbusServer = new Modbus.ModbusTCPServer(vector, {
+  // ServerTCP 构造函数自动启动监听，不需要手动调 listen()
+  server = new ServerTCP(vector, {
+    host: '127.0.0.1',
     port,
-    // Modbus TCP 没有用户名密码，安全靠网络隔离（和 MQTT 不同）
+    debug: false,
+    unitID: 1,
   })
 
-  modbusServer.listen(() => {
+  server.on('initialized', () => {
     logger.info(`[Modbus Simulator] Modbus TCP server listening on port ${port}`)
     logger.info(`[Modbus Simulator] Simulating: Temp=${sensorState.temperature}°C, Humidity=${sensorState.humidity}%, Smoke=${sensorState.smoke}ppm`)
   })
 
-  server = modbusServer
+  server.on('serverError', (err: Error) => {
+    logger.error(`[Modbus Simulator] Server error: ${err.message}`)
+  })
 
   // 模拟数据波动——每 10 秒微微变化，模拟真实传感器漂移
   waveTimer = setInterval(() => {
@@ -108,7 +113,7 @@ export function getSimulatedValues() {
 export function stopModbusSimulator(): void {
   if (waveTimer) clearInterval(waveTimer)
   if (server) {
-    server.close()
+    server.close(() => {})
     server = null
     logger.info('[Modbus Simulator] Stopped')
   }

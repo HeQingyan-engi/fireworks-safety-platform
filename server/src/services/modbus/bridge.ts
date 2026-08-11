@@ -11,11 +11,11 @@
  * 本模块连接本地 Modbus 模拟器（simulator.ts），周期读取寄存器并桥接到 MQTT。
  */
 
-import Modbus from 'modbus-serial'
+import ModbusRTU from 'modbus-serial'
 import logger from '../../utils/logger.js'
 import { handleSensorData } from '../mqtt/sensor-handler.js'
 
-let client: Modbus | null = null
+let client: ModbusRTU | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 interface ModbusReading {
@@ -48,7 +48,7 @@ export async function startModbusBridge(
     return
   }
 
-  client = new Modbus()
+  client = new ModbusRTU()
 
   try {
     // Modbus TCP 连接（和 HTTP/TCP 不同，是长连接）
@@ -96,11 +96,11 @@ export async function startModbusBridge(
  *   地址 2: 烟雾 (ppm)   → 直接使用
  *   地址 3: 设备状态     → 1=在线, 0=离线
  */
-async function readRegisters(client: Modbus): Promise<ModbusReading> {
+async function readRegisters(client: ModbusRTU): Promise<ModbusReading> {
   // 一次读取 4 个连续的 Holding Register（地址 0-3）
   const result = await client.readHoldingRegisters(0, 4)
 
-  // result.data 是一个 Buffer，每个寄存器占 2 字节（16位）
+  // result.data 是一个数组，每个元素对应一个寄存器的值（16位整数）
   const rawTemp = result.data[0]       // 如 285 = 28.5°C
   const rawHumidity = result.data[1]   // 如 520 = 52.0%
   const rawSmoke = result.data[2]      // 如 15 ppm
@@ -118,11 +118,11 @@ async function readRegisters(client: Modbus): Promise<ModbusReading> {
  * 单次读取（用于手动测试或 HTTP 触发）
  */
 export async function readOnce(host: string, port: number, deviceId: number): Promise<ModbusReading> {
-  const c = new Modbus()
+  const c = new ModbusRTU()
   await c.connectTCP(host, { port })
   c.setID(deviceId)
   const reading = await readRegisters(c)
-  c.close()
+  c.close(() => {})
   return reading
 }
 
@@ -132,7 +132,7 @@ export async function readOnce(host: string, port: number, deviceId: number): Pr
 export function stopModbusBridge(): void {
   if (pollTimer) clearInterval(pollTimer)
   if (client) {
-    client.close()
+    client.close(() => {})
     client = null
   }
   logger.info('[Modbus Bridge] Stopped')

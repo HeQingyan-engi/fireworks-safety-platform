@@ -36,7 +36,7 @@ async function bootstrap() {
     startModbusSimulator(5020)
     // 延迟 1 秒等模拟器就绪后启动桥接
     setTimeout(() => {
-      startModbusBridge('127.0.0.1', 5020, 1, 'CQ001', 'MODBUS-TH-001', 5000)
+      startModbusBridge('127.0.0.1', 5020, 1, 'FW-2026-001', 'MODBUS-TH-001', 5000)
     }, 1000)
     logger.info('✅ Modbus simulator + bridge started (dev mode)')
   }

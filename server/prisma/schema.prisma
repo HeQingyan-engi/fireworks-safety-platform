@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  realName  String?
+  phone     String?
+  role      String   @default("CLERK") // SUPER_ADMIN, GOV_INSPECTOR, ENTERPRISE_ADMIN, STORE_MANAGER, CLERK, CUSTOMER
+  storeId   Int?
+  store     Store?   @relation(fields: [storeId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  safetyAgreements SafetyAgreement[]
+  flowRegs         FlowReg[]         @relation("FlowOperator")
+  handledAlerts    Alert[]           @relation("AlertHandler")
+  inspections      Inspection[]
+  auditLogs        AuditLog[]
+}
+
+model Store {
+  id       Int     @id @default(autoincrement())
+  name     String
+  code     String  @unique
+  address  String
+  lat      Float?
+  lng      Float?
+  contact  String?
+  phone    String?
+  status   String  @default("NORMAL") // NORMAL, CAUTION, DANGER
+  capacity Float? // 核定存储量(kg)
+
+  users       User[]
+  inventory   Inventory[]
+  flowRegs    FlowReg[]
+  alerts      Alert[]
+  cameras     Camera[]
+  orders      Order[]
+  inspections Inspection[]
+  devices     Device[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id                 Int      @id @default(autoincrement())
+  name               String
+  price              Float
+  categoryId         Int
+  category           Category @relation(fields: [categoryId], references: [id])
+  safetyLevel        String? // C, D, B
+  powderQuantity     String? // 药量(g)
+  safetyDistance     String? // 安全距离(m)
+  standards          String? // 执行标准编号
+  description        String?
+  isKidFriendly      Boolean  @default(false)
+  isOnSale           Boolean  @default(false)
+  originalPrice      Float?
+  effectVideoUrl     String?
+  appearanceVideoUrl String?
+  imageUrl           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  inventory  Inventory[]
+  orderItems OrderItem[]
+  flowRegs   FlowReg[]
+}
+
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  storeId   Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, productId])
+}
+
+model Order {
+  id            Int      @id @default(autoincrement())
+  orderNo       String   @unique
+  customerName  String
+  customerPhone String?
+  storeId       Int
+  store         Store    @relation(fields: [storeId], references: [id])
+  totalAmount   Float
+  status        String   @default("PENDING") // PENDING, PAID, READY, PICKED_UP, CANCELLED
+  pickupCode    String?
+  signedSafety  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items            OrderItem[]
+  safetyAgreements SafetyAgreement[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
+
+model FlowReg {
+  id         Int      @id @default(autoincrement())
+  storeId    Int
+  store      Store    @relation(fields: [storeId], references: [id])
+  type       String // PURCHASE, SALE, RETURN, DESTROY
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id])
+  quantity   Int
+  batchNo    String?
+  supplier   String?
+  operatorId Int
+  operator   User     @relation("FlowOperator", fields: [operatorId], references: [id])
+  remark     String?
+  createdAt  DateTime @default(now())
+}
+
+model SafetyAgreement {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id])
+  orderId        Int
+  order          Order    @relation(fields: [orderId], references: [id])
+  signatureImage String // Base64 image
+  agreedAt       DateTime @default(now())
+}
+
+model Camera {
+  id        Int      @id @default(autoincrement())
+  storeId   Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  name      String
+  rtspUrl   String?
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Alert {
+  id          Int       @id @default(autoincrement())
+  storeId     Int
+  store       Store     @relation(fields: [storeId], references: [id])
+  type        String // OVERSTOCK, CROWD_GATHERING, SMOKING, OUT_OF_SCOPE_SALES, OUTDOOR_ILLEGAL, OUTDOOR_TEST_FIRE, TEMP_HUMIDITY_ANOMALY, SMOKE_FIRE
+  level       String // YELLOW, ORANGE, RED
+  title       String
+  description String?
+  imageUrl    String?
+  status      String    @default("NEW") // NEW, ACKNOWLEDGED, HANDLING, RESOLVED
+  handledBy   Int?
+  handler     User?     @relation("AlertHandler", fields: [handledBy], references: [id])
+  rectifiedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Inspection {
+  id          Int      @id @default(autoincrement())
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+  inspectorId Int
+  inspector   User     @relation(fields: [inspectorId], references: [id])
+  result      String // PASS, FAIL, RECTIFY
+  score       Int?
+  remark      String?
+  photos      String? // JSON array of URLs
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  Int?
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+// ===================== IoT 设备 =====================
+model Device {
+  id           Int      @id @default(autoincrement())
+  storeId      Int
+  store        Store    @relation(fields: [storeId], references: [id])
+  type         String   // TEMP_HUMIDITY, SMOKE, CAMERA_AI, INFRARED_COUNTER, RELAY
+  name         String
+  serialNo     String   @unique
+  mqttTopic    String?
+  status       String   @default("ONLINE") // ONLINE, OFFLINE, ERROR
+  lastHeartbeat DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  readings DeviceReading[]
+
+  @@index([storeId, type])
+}
+
+model DeviceReading {
+  id        Int      @id @default(autoincrement())
+  deviceId  Int
+  device    Device   @relation(fields: [deviceId], references: [id])
+  storeId   Int
+  key       String   // temperature, humidity, smoke, personCount
+  value     Float
+  unit      String?  // °C, %RH, ppm, count
+  timestamp DateTime @default(now())
+
+  @@index([deviceId, timestamp])
+  @@index([storeId, key, timestamp])
+}
+
+// ===================== 预警规则 =====================
+model AlertRule {
+  id          Int      @id @default(autoincrement())
+  storeId     Int?
+  alertType   String   // OVERSTOCK, TEMP_HUMIDITY_ANOMALY, SMOKE_FIRE, etc.
+  name        String
+  enabled     Boolean  @default(true)
+  priority    Int      @default(0)
+  conditions  String   // JSON: [{"metric":"temperature","operator":">=","value":35}]
+  logicOp     String   @default("ANY") // ALL, ANY
+  alertLevel  String   @default("YELLOW") // YELLOW, ORANGE, RED
+  titleTmpl   String   // 标题模板
+  descTmpl    String?  // 描述模板
+  dedupWindow Int      @default(5) // 冷却时间(分钟)
+  escalationEnabled  Boolean @default(false)
+  escalateAfterMin   Int?
+  escalateToLevel    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([storeId, alertType])
+}
+
+// ===================== 通知配置 =====================
+model NotificationChannel {
+  id        Int      @id @default(autoincrement())
+  storeId   Int?
+  type      String   // SMS, VOICE, DINGTALK, WECHAT_WORK, EMAIL, ONSITE_ALARM
+  name      String
+  config    String   // JSON: API keys, phone numbers, webhook URLs
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NotificationLog {
+  id        Int      @id @default(autoincrement())
+  alertId   Int?
+  channelId Int
+  status    String   // SUCCESS, FAILED, PENDING
+  message   String?
+  createdAt DateTime @default(now())
+}

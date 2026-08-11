@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # ==================== 后端服务 ====================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://fireworks:fireworks2026@db:5432/fireworks
+      - MQTT_BROKER_URL=mqtt://emqx:1883
+    depends_on:
+      db:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+    volumes:
+      - uploads:/app/uploads
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - fireworks-net
+
+  # ==================== PostgreSQL 数据库 ====================
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fireworks
+      POSTGRES_USER: fireworks
+      POSTGRES_PASSWORD: fireworks2026
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fireworks"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - fireworks-net
+
+  # ==================== MQTT Broker（EMQX）====================
+  emqx:
+    image: emqx/emqx:5.7.0
+    environment:
+      - EMQX_NAME=emqx
+      - EMQX_HOST=emqx
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=fireworks2026
+    ports:
+      - "1883:1883"   # MQTT
+      - "8083:8083"   # MQTT/WebSocket
+      - "18083:18083" # Dashboard
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+    restart: unless-stopped
+    networks:
+      - fireworks-net
+
+  # ==================== Nginx 反向代理 ====================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - uploads:/usr/share/nginx/html/uploads:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - fireworks-net
+
+  # ==================== 数据库备份（可选）====================
+  db-backup:
+    image: postgres:16-alpine
+    volumes:
+      - postgres-backup:/backup
+    entrypoint: |
+      sh -c '
+        echo "0 4 * * * pg_dump -h db -U fireworks fireworks | gzip > /backup/fireworks-\$(date +\%Y\%m\%d).sql.gz 2>&1" > /tmp/crontab
+        echo "0 5 * * * find /backup -name \"*.sql.gz\" -mtime +7 -delete" >> /tmp/crontab
+        crontab /tmp/crontab
+        crond -f
+      '
+    depends_on:
+      - db
+    networks:
+      - fireworks-net
+
+volumes:
+  postgres-data:
+  postgres-backup:
+  emqx-data:
+  emqx-log:
+  uploads:
+
+networks:
+  fireworks-net:
+    driver: bridge

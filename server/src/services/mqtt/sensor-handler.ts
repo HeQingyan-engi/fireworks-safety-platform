@@ -22,9 +22,16 @@ interface SensorMessage {
 }
 
 /**
- * Parse MQTT topic and route sensor data to the rule engine.
+ * 解析 MQTT 主题并将传感器数据路由到规则引擎。
  *
  * Topic format: fw/{storeCode}/{deviceType}/{serialNo}/{action}
+ *
+ * QoS 选择说明：
+ * - 传感器数据全部使用 QoS 1（至少一次送达）
+ * - 不选 QoS 0：安全监测数据不允许丢包（烟雾/温度报警漏报会导致事故）
+ * - 不选 QoS 2：传感器上报频率高（5-30s/次），QoS 2 的四次握手开销太大
+ *   且传感器数据天然幂等（新读数会覆盖旧读数），不需要精确一次语义
+ * - 遗嘱消息配合 QoS 1 + retain，保证边缘设备在服务器离线后可切换本地模式
  */
 export async function handleSensorData(topic: string, data: SensorMessage): Promise<void> {
   const parts = topic.split('/')

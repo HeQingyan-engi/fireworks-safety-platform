@@ -23,10 +23,24 @@ export async function initMQTT(): Promise<void> {
       keepalive: 60,
       reconnectPeriod: 5000,
       connectTimeout: 10000,
+      // Will Message: 服务器意外断线时，EMQX 自动广播离线状态
+      // 边缘网关订阅 fw/server/status 后可在服务器离线时切换本地自治模式
+      will: {
+        topic: 'fw/server/status',
+        payload: JSON.stringify({ status: 'offline', timestamp: Date.now() }),
+        qos: 1,
+        retain: true,   // 保留最后一条遗嘱，新上线的设备也能看到
+      },
     })
 
     client.on('connect', () => {
       logger.info('[MQTT] Connected to broker')
+
+      // 清除遗嘱，发布上线通知
+      client?.publish('fw/server/status', JSON.stringify({
+        status: 'online',
+        timestamp: Date.now(),
+      }), { qos: 1, retain: true })
 
       // Subscribe to all sensor data topics
       const topics = [

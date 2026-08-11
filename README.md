@@ -17,6 +17,20 @@
 | **企业管理后台** | 门店/企业 | 商品管理、进销存、流向登记、视频监控、预警处理、数据报表 |
 | **政府监管端** | 应急管理局 | 实时地图、一企一档、预警督查、移动执法巡查 |
 
+## 📸 系统截图
+
+| 管理后台仪表盘 | 预警管理 |
+|---|---|
+| ![dashboard](docs/screenshots/dashboard.png) | ![alerts](docs/screenshots/alerts.png) |
+
+| 产品管理 | 政府监管地图 |
+|---|---|
+| ![products](docs/screenshots/products.png) | ![gov-map](docs/screenshots/gov-map.png) |
+
+| 登录页 |
+|---|
+| ![login](docs/screenshots/login.png) |
+
 ## 🏗️ 技术架构
 
 ```

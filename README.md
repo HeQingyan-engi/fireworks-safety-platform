@@ -260,5 +260,5 @@ MIT
 
 ---
 
-**作者**：何清彦  
+**作者**：何皓宁（GitHub: HeQingyan-engi）  
 **技术栈关键词**：Vue3 · TypeScript · Express · Prisma · MQTT(EMQX Cloud) · Modbus TCP · Socket.IO · Docker · 物联网 · 风险预警 · RBAC · 边缘计算
